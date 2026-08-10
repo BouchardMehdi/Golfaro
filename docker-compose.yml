@@ -1,0 +1,113 @@
+name: golfaro
+
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-http://localhost:8088}
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-/api/v1}
+    init: true
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      HOSTNAME: 0.0.0.0
+      PORT: 3000
+      INTERNAL_API_URL: http://backend:8000/api/v1
+    ports:
+      - "127.0.0.1:${FRONTEND_PORT:-8088}:3000"
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - application
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3000/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    logging: *default-logging
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    init: true
+    restart: unless-stopped
+    environment:
+      GOLFARO_APP_ENV: ${GOLFARO_APP_ENV:-production}
+      GOLFARO_DEBUG: ${GOLFARO_DEBUG:-false}
+      GOLFARO_APP_VERSION: ${GOLFARO_APP_VERSION:-0.1.0}
+      GOLFARO_ALLOWED_HOSTS: ${GOLFARO_ALLOWED_HOSTS:-localhost,127.0.0.1}
+      GOLFARO_CORS_ORIGINS: ${GOLFARO_CORS_ORIGINS:-http://localhost:8088}
+      POSTGRES_HOST: db
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: ${POSTGRES_DB:-golfaro}
+      POSTGRES_USER: ${POSTGRES_USER:-golfaro}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}
+    ports:
+      - "127.0.0.1:${BACKEND_PORT:-3008}:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - application
+      - database
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/v1/health', timeout=3)",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    logging: *default-logging
+
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-golfaro}
+      POSTGRES_USER: ${POSTGRES_USER:-golfaro}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - database
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\"",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    logging: *default-logging
+
+networks:
+  application:
+  database:
+    internal: true
+
+volumes:
+  postgres_data:
