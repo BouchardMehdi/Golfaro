@@ -1,5 +1,7 @@
 # Golfaro
 
+[![CI](https://github.com/BouchardMehdi/Golfaro/actions/workflows/ci.yml/badge.svg)](https://github.com/BouchardMehdi/Golfaro/actions/workflows/ci.yml)
+
 Golfaro est un SaaS multi-tenant de gestion des opérations quotidiennes d'un club de golf. Le premier objectif produit couvre les employés, les clients, les parcours, les départs et les réservations.
 
 Ce dépôt contient uniquement les fondations techniques. Les modules métier seront ajoutés progressivement par tranches verticales testées.
@@ -92,6 +94,8 @@ npm run lint
 npm run typecheck
 npm run build
 ```
+
+La workflow GitHub Actions exécute ces contrôles sur chaque Pull Request et sur chaque push vers `main`. Après leur réussite, elle construit les images Docker, applique les migrations sur une base éphémère et vérifie les trois endpoints de santé de la stack complète.
 
 ## Migrations
 
